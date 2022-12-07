@@ -1,86 +1,73 @@
 from flask import Flask, render_template, request
 import numpy as np
 import pickle
+import sounddevice as sd
+import wavio as wv
+import librosa
 
 
 import speech_recognition as sr
 
 
-def recognize_speech_from_mic(recognizer, microphone):
-   """Transcribe speech from recorded from `microphone`.
-   Returns a dictionary with three keys:
-   "success": a boolean indicating whether or not the API request was
-               successful
-   "error":   `None` if no error occured, otherwise a string containing
-               an error message if the API could not be reached or
-               speech was unrecognizable
-   "transcription": `None` if speech could not be transcribed,
-               otherwise a string containing the transcribed text
-   """
-   # check that recognizer and microphone arguments are appropriate type
-   if not isinstance(recognizer, sr.Recognizer):
-      raise TypeError("`recognizer` must be `Recognizer` instance")
-
-   if not isinstance(microphone, sr.Microphone):
-      raise TypeError("`microphone` must be `Microphone` instance")
-
-   # adjust the recognizer sensitivity to ambient noise and record audio
-   # from the microphone
-   with microphone as source:
-      recognizer.adjust_for_ambient_noise(source)
-      audio = recognizer.listen(source)
-
-   # set up the response object
-   response = {
-      "success": True,
-      "error": None,
-      "transcription": None
-   }
-
-   # try recognizing the speech in the recording
-   # if a RequestError or UnknownValueError exception is caught,
-   #     update the response object accordingly
-   try:
-      response["transcription"] = recognizer.recognize_google(audio)
-   except sr.RequestError:
-      # API was unreachable or unresponsive
-      response["success"] = False
-      response["error"] = "API unavailable"
-   except sr.UnknownValueError:
-      # speech was unintelligible
-      response["error"] = "Unable to recognize speech"
-
-   return response
-
-
 
 app = Flask(__name__,template_folder="templates")
 
-ButtonPressed = 0
-# @app.route('/')
-# def hello_name():
-#    return render_template('index.html')
+def record():
+   # Sampling frequency
+   frequency = 44400
+   # Recording duration in seconds
+   duration = 2
+   # to record audio from
+   # sound-device into a Numpy
+   recording = sd.rec(int(duration * frequency),samplerate = frequency, channels = 2)
+   # Wait for the audio to complete
+   sd.wait()
+   # using wavio to save the recording in .wav format
+   # This will convert the NumPy array to an audio
+   # file with the given sampling frequency
+   wv.write("audio.wav", recording, frequency, sampwidth=2)
 
-    
-# @app.route('/', methods=['GET', 'POST'])
-# def button():
-#    global ButtonPressed
-#    if request.method == "POST":
-#       ButtonPressed += 1
-#       print(ButtonPressed)
-#       return render_template("index.html", ButtonPressed = ButtonPressed)
-#       # I think you want to increment, that case ButtonPressed will be plus 1.
-#    # return render_template("index.html", ButtonPressed = ButtonPressed)
+def load(x):
+   model = pickle.load(open("trainedModel.sav",'rb')) 
+   y=model.predict(np.array(x).reshape(1,-1))[0]
+   return y
+
+def extractWavFeatures():
+   list_of_features=[]
+   y, sr = librosa.load('audio.wav', mono=True, duration=30)
+   # remove leading and trailing silence
+   y, index = librosa.effects.trim(y)
+
+   chroma_stft = librosa.feature.chroma_stft(y=y, sr=sr)
+   rmse = librosa.feature.rms(y=y)
+   spec_cent = librosa.feature.spectral_centroid(y=y, sr=sr)
+   spec_bw = librosa.feature.spectral_bandwidth(y=y, sr=sr)
+   rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)
+   zcr = librosa.feature.zero_crossing_rate(y)
+   mfcc = librosa.feature.mfcc(y=y, sr=sr)
+
+   list_of_features.append(np.mean(chroma_stft))
+   list_of_features.append(np.mean(rmse))
+   list_of_features.append(np.mean(spec_cent))
+   list_of_features.append(np.mean(spec_bw))
+   list_of_features.append(np.mean(rolloff))
+   list_of_features.append(np.mean(zcr))
+
+   for e in mfcc:
+         list_of_features.append(np.mean(e))
+   
+   return(list_of_features)
+
+
 
 @app.route('/', methods=['GET', 'POST'])
-def record():
-   # create recognizer and mic instances
-   recognizer = sr.Recognizer()
-   microphone = sr.Microphone()
-   guess = recognize_speech_from_mic(recognizer, microphone)
-      # show the user the transcription
-   print("You said: {}".format(guess["transcription"]))
-   return render_template("index.html", words = guess["transcription"])
+def speechRecognation():
+   record()
+   audio_features=[]
+   audio_features.append(extractWavFeatures())
+   value=load(audio_features)
+   print(value)
+   return render_template('index.html',words=value)
 
 if __name__ == '__main__':
    app.run(debug=True)
