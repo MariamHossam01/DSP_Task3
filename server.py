@@ -27,7 +27,7 @@ def record():
    # using wavio to save the recording in .wav format
    # This will convert the NumPy array to an audio
    # file with the given sampling frequency
-   wv.write("audio.wav", recording, frequency, sampwidth=2)
+   wv.write("audio/audio.wav", recording, frequency, sampwidth=2)
 
 def load_speech_model(x):
    model = pickle.load(open("trainedModel.sav",'rb')) 
@@ -36,7 +36,7 @@ def load_speech_model(x):
 
 def extractWavFeatures():
    list_of_features=[]
-   y, sr = librosa.load('audio.wav', mono=True, duration=30)
+   y, sr = librosa.load('audio/audio.wav', mono=True, duration=30)
    # remove leading and trailing silence
    y, index = librosa.effects.trim(y)
 
