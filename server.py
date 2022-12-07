@@ -1,6 +1,8 @@
+import os
 from flask import Flask, render_template, request
 import numpy as np
 import pickle
+import pandas as pd
 import sounddevice as sd
 import wavio as wv
 import librosa
@@ -59,9 +61,15 @@ def extractWavFeatures():
    return(list_of_features)
 
 
-def extract_features_sound():
+def extract_features_sound(filename):
    try:
-      X, sample_rate = librosa.load('audio.wav', mono=True, duration=30) 
+# Sets the name to be the path to where the file is in my computer
+      # file_name = os.path.join(os.path.abspath(f'/audio/{filename}'))
+
+      # Loads the audio file as a floating point time series and assigns the default sample rate
+      # Sample rate is set to 22050 by default
+      
+      X, sample_rate = librosa.load('audio\\audio.wav', res_type='kaiser_fast') 
       
       # Generate Mel-frequency cepstral coefficients (MFCCs) from a time series 
       mfccs = np.mean(librosa.feature.mfcc(y=X, sr=sample_rate, n_mfcc=40).T,axis=0)
@@ -83,9 +91,10 @@ def extract_features_sound():
       sr=sample_rate).T,axis=0)
 
    except:
+      print('pass')
       pass
 
-   return ([mfccs, chroma, mel, contrast, tonnetz])
+   return mfccs, chroma, mel, contrast, tonnetz
 
 
 def feat(features_label):
@@ -96,42 +105,42 @@ def feat(features_label):
                features_label[i][4]), axis=0))
    return features   
 
-def extarct_features():
-   list_of_features=[]
+# def extarct_features():
+#    list_of_features=[]
    
-   X, sample_rate = librosa.load('audio.wav', mono=True, duration=30)
-   # Generate Mel-frequency cepstral coefficients (MFCCs) from a time series 
-   mfccs = np.mean(librosa.feature.mfcc(y=X, sr=sample_rate, n_mfcc=40).T,axis=0)
+#    X, sample_rate = librosa.load('audio.wav', mono=True, duration=30)
+#    # Generate Mel-frequency cepstral coefficients (MFCCs) from a time series 
+#    mfccs = np.mean(librosa.feature.mfcc(y=X, sr=sample_rate, n_mfcc=40).T,axis=0)
 
-   # Generates a Short-time Fourier transform (STFT) to use in the chroma_stft
-   stft = np.abs(librosa.stft(X))
+#    # Generates a Short-time Fourier transform (STFT) to use in the chroma_stft
+#    stft = np.abs(librosa.stft(X))
 
-   # Computes a chromagram from a waveform or power spectrogram.
-   chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T,axis=0)
+#    # Computes a chromagram from a waveform or power spectrogram.
+#    chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T,axis=0)
 
-   # Computes a mel-scaled spectrogram.
-   mel = np.mean(librosa.feature.melspectrogram(X, sr=sample_rate).T,axis=0)
+#    # Computes a mel-scaled spectrogram.
+#    mel = np.mean(librosa.feature.melspectrogram(X, sr=sample_rate).T,axis=0)
 
-   # Computes spectral contrast
-   contrast = np.mean(librosa.feature.spectral_contrast(S=stft, sr=sample_rate).T,axis=0)
+#    # Computes spectral contrast
+#    contrast = np.mean(librosa.feature.spectral_contrast(S=stft, sr=sample_rate).T,axis=0)
 
-   # Computes the tonal centroid features (tonnetz)
-   tonnetz = np.mean(librosa.feature.tonnetz(y=librosa.effects.harmonic(X),
-   sr=sample_rate).T,axis=0)
+#    # Computes the tonal centroid features (tonnetz)
+#    tonnetz = np.mean(librosa.feature.tonnetz(y=librosa.effects.harmonic(X),
+#    sr=sample_rate).T,axis=0)
 
-   list_of_features.append(mfccs)
-   list_of_features.append(chroma)
-   list_of_features.append(mel)
-   list_of_features.append(contrast)
-   list_of_features.append(tonnetz)
+#    list_of_features.append(mfccs)
+#    list_of_features.append(chroma)
+#    list_of_features.append(mel)
+#    list_of_features.append(contrast)
+#    list_of_features.append(tonnetz)
    
 
-   features = []
-   for i in range(0, len(list_of_features)):
-      features.append(np.concatenate((list_of_features[i][0], list_of_features[i][1], 
-               list_of_features[i][2], list_of_features[i][3],
-               list_of_features[i][4]), axis=0))
-   return features
+#    features = []
+#    for i in range(0, len(list_of_features)):
+#       features.append(np.concatenate((list_of_features[i][0], list_of_features[i][1], 
+#                list_of_features[i][2], list_of_features[i][3],
+#                list_of_features[i][4]), axis=0))
+#    return features
 
 
 def load_sound_model(x):
@@ -152,11 +161,18 @@ def speechRecognation():
    else:
       word='close the door'
    # speaker
-   sound_features=[]
+   filelist = os.listdir('audio/')
+   df_test = pd.DataFrame(filelist)
+   df_test['label']=0
+   df_test = df_test.rename(columns={0:'file'})
+   print(df_test)
+   features_label2 = df_test.apply(extract_features_sound, axis=1)
+   soundFeatures=feat(features_label2)
+   # sound_features=[]
    # sound_features.append(extarct_features())
-   sound_features.append(extract_features_sound())
+   # sound_features=extract_features_sound()
    # soundFeatures=feat(sound_features)
-   persons=load_sound_model(sound_features)
+   persons=load_sound_model(soundFeatures)
    if persons==0:
       person='Dina'
    elif persons==1:

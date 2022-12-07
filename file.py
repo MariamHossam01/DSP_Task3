@@ -58,7 +58,7 @@ def recognize_speech_from_mic(recognizer, microphone):
 
 
 
-app = Flask(_name_,template_folder="templates")
+app = Flask(__name__,template_folder="templates")
 
 ButtonPressed = 0
 # @app.route('/')
