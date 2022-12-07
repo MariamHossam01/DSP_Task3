@@ -1,23 +1,8 @@
-import warnings
-
 import numpy as np
-import scipy
-import scipy.ndimage
 import scipy.signal
 import scipy.interpolate
 import librosa
 
-from numba import jit
-
-# from . import convert
-# from .fft import get_fftlib
-# from .audio import resample
-# from .._cache import cache
-from .. import util
-# from ..util.exceptions import ParameterError
-# from ..filters import get_window, semitone_filterbank
-# from ..filters import window_sumsquare
-# from ..util.decorators import deprecate_positional_args
 
 def chroma_stft(*,y=None,sr=22050,S=None,norm=np.inf,n_fft=2048,hop_length=512,win_length=None,window="hann",center=True,pad_mode="constant",tuning=None,n_chroma=12,**kwargs):
 
@@ -45,7 +30,7 @@ def chroma_stft(*,y=None,sr=22050,S=None,norm=np.inf,n_fft=2048,hop_length=512,w
     raw_chroma = np.einsum("cf,...ft->...ct", chromafb, S, optimize=True)
 
     # Compute normalization factor for each frame
-    return util.normalize(raw_chroma, norm=norm, axis=-2)
+    return normalize(raw_chroma, norm=norm, axis=-2)
 
 
 def _spectrogram(*,y=None,S=None,n_fft=2048,hop_length=512,power=1,win_length=None,window="hann",center=True,pad_mode="constant"):
@@ -98,7 +83,7 @@ def pitch_tuning(frequencies, *, resolution=0.01, bins_per_octave=12):
     frequencies = frequencies[frequencies > 0]
 
     # Compute the residual relative to the number of bins
-    residual = np.mod(bins_per_octave * convert.hz_to_octs(frequencies), 1.0)
+    residual = np.mod(bins_per_octave * hz_to_octs(frequencies), 1.0)
 
     # Are we on the wrong side of the semitone?
     # A residual of 0.95 is more likely to be a deviation of -0.05
@@ -144,7 +129,7 @@ def chroma(*,sr,n_fft,n_chroma=12,tuning=0.0,ctroct=5.0,octwidth=2,norm=2,base_c
     wts = np.exp(-0.5 * (2 * D / np.tile(binwidthbins, (n_chroma, 1))) ** 2)
 
     # normalize each column
-    wts = util.normalize(wts, norm=norm, axis=0)
+    wts = normalize(wts, norm=norm, axis=0)
 
     # Maybe apply scaling for fft bins
     if octwidth is not None:
@@ -158,3 +143,83 @@ def chroma(*,sr,n_fft,n_chroma=12,tuning=0.0,ctroct=5.0,octwidth=2,norm=2,base_c
 
     # remove aliasing columns, copy to ensure row-contiguity
     return np.ascontiguousarray(wts[:, : int(1 + n_fft / 2)], dtype=dtype)
+
+
+def hz_to_octs(frequencies, *, tuning=0.0, bins_per_octave=12):
+
+    A440 = 440.0 * 2.0 ** (tuning / bins_per_octave)
+
+    return np.log2(np.asanyarray(frequencies) / (float(A440) / 16))
+
+def normalize(S, *, norm=np.inf, axis=0, threshold=None, fill=None):
+    # Avoid div-by-zero
+    if threshold is None:
+        threshold = tiny(S)
+
+
+    # All norms only depend on magnitude, let's do that first
+    mag = np.abs(S).astype(float)
+
+    # For max/min norms, filling with 1 works
+    fill_norm = 1
+
+    if norm == np.inf:
+        length = np.max(mag, axis=axis, keepdims=True)
+
+    elif norm == -np.inf:
+        length = np.min(mag, axis=axis, keepdims=True)
+
+
+        length = np.sum(mag > 0, axis=axis, keepdims=True, dtype=mag.dtype)
+
+    elif np.issubdtype(type(norm), np.number) and norm > 0:
+        length = np.sum(mag ** norm, axis=axis, keepdims=True) ** (1.0 / norm)
+
+        if axis is None:
+            fill_norm = mag.size ** (-1.0 / norm)
+        else:
+            fill_norm = mag.shape[axis] ** (-1.0 / norm)
+
+    elif norm is None:
+        return S
+
+
+    # indices where norm is below the threshold
+    small_idx = length < threshold
+
+    Snorm = np.empty_like(S)
+    if fill is None:
+        # Leave small indices un-normalized
+        length[small_idx] = 1.0
+        Snorm[:] = S / length
+
+    elif fill:
+        # If we have a non-zero fill value, we locate those entries by
+        # doing a nan-divide.
+        # If S was finite, then length is finite (except for small positions)
+        length[small_idx] = np.nan
+        Snorm[:] = S / length
+        Snorm[np.isnan(Snorm)] = fill_norm
+    else:
+        # Set small values to zero by doing an inf-divide.
+        # This is safe (by IEEE-754) as long as S is finite.
+        length[small_idx] = np.inf
+        Snorm[:] = S / length
+
+    return Snorm
+
+
+def tiny(x):
+
+    # Make sure we have an array view
+    x = np.asarray(x)
+
+    # Only floating types generate a tiny
+    if np.issubdtype(x.dtype, np.floating) or np.issubdtype(
+        x.dtype, np.complexfloating
+    ):
+        dtype = x.dtype
+    else:
+        dtype = np.float32
+
+    return np.finfo(dtype).tiny
