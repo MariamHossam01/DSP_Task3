@@ -117,7 +117,7 @@ def speechRecognation():
       word='close the door'
    # speaker
    speaker_features=[]
-   speaker_features.append(extractSpeakerFeatures())
+   speaker_features.append(extractWavFeatures())
    persons=load_sound_model(speaker_features)
    if persons==0:
       person='Dina'
