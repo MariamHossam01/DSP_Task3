@@ -18,7 +18,7 @@ def record():
    # Sampling frequency
    frequency = 44400
    # Recording duration in seconds
-   duration = 2
+   duration = 2.5
    # to record audio from
    # sound-device into a Numpy
    recording = sd.rec(int(duration * frequency),samplerate = frequency, channels = 2)
@@ -113,11 +113,13 @@ def speechRecognation():
    words=load_speech_model(speech_features)
    if words==0:
       word='open the door'
-   else:
+   elif words==1:
       word='close the door'
+   else:
+      word='others'
    # speaker
    speaker_features=[]
-   speaker_features.append(extractWavFeatures())
+   speaker_features.append(extractSpeakerFeatures())
    persons=load_sound_model(speaker_features)
    if persons==0:
       person='Dina'
@@ -130,7 +132,7 @@ def speechRecognation():
    else:
       person='others'
 
-   
+   print(f'speaker{persons},words{words}')
    return render_template('index.html',words=word,persons=person)
 
 if __name__ == '__main__':
