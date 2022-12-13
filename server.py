@@ -2,32 +2,41 @@ import os
 from flask import Flask, render_template, request
 import numpy as np
 import pickle
-import pandas as pd
-import sounddevice as sd
-import wavio as wv
 import librosa
-
-
-import speech_recognition as sr
-
-
+import pyaudio
+import wave
+import python_speech_features as mfcc
+from sklearn.mixture import GaussianMixture 
+from sklearn import preprocessing
 
 app = Flask(__name__,template_folder="templates")
 
+
 def record():
-   # Sampling frequency
-   frequency = 44400
-   # Recording duration in seconds
-   duration = 2.5
-   # to record audio from
-   # sound-device into a Numpy
-   recording = sd.rec(int(duration * frequency),samplerate = frequency, channels = 2)
-   # Wait for the audio to complete
-   sd.wait()
-   # using wavio to save the recording in .wav format
-   # This will convert the NumPy array to an audio
-   # file with the given sampling frequency
-   wv.write("audio/audio.wav", recording, frequency, sampwidth=2)
+		FORMAT = pyaudio.paInt16
+		CHANNELS = 1
+		RATE = 44100
+		CHUNK = 512
+		RECORD_SECONDS = 2.5
+		audio = pyaudio.PyAudio()
+		stream = audio.open(format=FORMAT, channels=CHANNELS,
+						rate=RATE, input=True,input_device_index = 1,
+						frames_per_buffer=CHUNK)
+		Recordframes = []
+		for i in range(0, int(RATE / CHUNK * RECORD_SECONDS)):
+			data = stream.read(CHUNK)
+			Recordframes.append(data)
+		stream.stop_stream()
+		stream.close()
+		audio.terminate()
+		WAVE_OUTPUT_FILENAME=os.path.join("audio","audio.wav")
+		waveFile = wave.open(WAVE_OUTPUT_FILENAME, 'wb')
+		waveFile.setnchannels(CHANNELS)
+		waveFile.setsampwidth(audio.get_sample_size(FORMAT))
+		waveFile.setframerate(RATE)
+		waveFile.writeframes(b''.join(Recordframes))
+		waveFile.close()
+
 
 def load_speech_model(x):
    model = pickle.load(open("trainedModel.sav",'rb')) 
@@ -36,7 +45,7 @@ def load_speech_model(x):
 
 def extractWavFeatures():
    list_of_features=[]
-   y, sr = librosa.load('audio/audio.wav', mono=True, duration=30)
+   y, sr = librosa.load('audio/audio.wav', mono=True, duration=2.5)
    # remove leading and trailing silence
    y, index = librosa.effects.trim(y)
 
@@ -60,41 +69,57 @@ def extractWavFeatures():
    
    return(list_of_features)
 
-def extractSpeakerFeatures():
-   list_of_features=[]
-   X, sample_rate = librosa.load('audio/audio.wav', mono=True, duration=30)
+def calculate_delta(array):
+
+   rows,cols = array.shape
+   print(rows)
+   print(cols)
+   deltas = np.zeros((rows,20))
+   N = 2
+   for i in range(rows):
+      index = []
+      j = 1
+      while j <= N:
+         if i-j < 0:
+            first =0
+         else:
+            first = i-j
+         if i+j > rows-1:
+            second = rows-1
+         else:
+            second = i+j 
+         index.append((second,first))
+         j+=1
+      deltas[i] = ( array[index[0][0]]-array[index[0][1]] + (2 * (array[index[1][0]]-array[index[1][1]])) ) / 10
+   return deltas
+
+
+def extract_features(audio,rate):
    
-   # Generate Mel-frequency cepstral coefficients (MFCCs) from a time series 
-   mfccs = np.mean(librosa.feature.mfcc(y=X, sr=sample_rate, n_mfcc=40).T,axis=0)
+   mfcc_feature = mfcc.mfcc(audio,rate, 0.025, 0.01,20,nfft = 1200, appendEnergy = True)    
+   mfcc_feature = preprocessing.scale(mfcc_feature)
+   # print(mfcc_feature)
+   delta = calculate_delta(mfcc_feature)
+   combined = np.hstack((mfcc_feature,delta)) 
+   return combined
 
-   # Generates a Short-time Fourier transform (STFT) to use in the chroma_stft
-   stft = np.abs(librosa.stft(X))
+def speaker_model():
 
-   # Computes a chromagram from a waveform or power spectrogram.
-   chroma = np.mean(librosa.feature.chroma_stft(S=stft, sr=sample_rate).T,axis=0)
+   audio, sr = librosa.load('audio/audio.wav', mono=True, duration=2.5)
+   vector   = extract_features(audio,sr)
 
-   # Computes a mel-scaled spectrogram.
-   mel = np.mean(librosa.feature.melspectrogram(X, sr=sample_rate).T,axis=0)
+   gmm_files    = ['gmm_models/dina.gmm','gmm_models/kareman.gmm','gmm_models/mariam.gmm','gmm_models/nada.gmm']
+   models    = [pickle.load(open(fname,'rb')) for fname in gmm_files]
+   log_likelihood = np.zeros(len(models)) 
 
-   # Computes spectral contrast
-   contrast = np.mean(librosa.feature.spectral_contrast(S=stft, sr=sample_rate).T,axis=0)
-
-   # Computes the tonal centroid features (tonnetz)
-   tonnetz = np.mean(librosa.feature.tonnetz(y=librosa.effects.harmonic(X),
-   sr=sample_rate).T,axis=0)
-
-   for e in chroma:
-      list_of_features.append (np.mean(e))
-   for e in mel:
-      list_of_features.append (np.mean(e))
-   for e in contrast:
-      list_of_features.append (np.mean(e))
-   for e in tonnetz:
-      list_of_features.append (np.mean(e))
-   for e in mfccs:
-      list_of_features.append (np.mean(e))
-   
-   return(list_of_features)
+   for i in range(len(models)):
+      gmm    = models[i]  #checking with each model one by one
+      scores = np.array(gmm.score(vector))
+      log_likelihood[i] = scores.sum()
+   print(log_likelihood)
+   winner = np.argmax(log_likelihood)
+   speakers=['dina','kareman','mariam','nada']
+   return speakers[winner]
 
 
 def load_sound_model(x):
@@ -118,22 +143,23 @@ def speechRecognation():
    else:
       word='others'
    # speaker
-   speaker_features=[]
-   speaker_features.append(extractSpeakerFeatures())
-   persons=load_sound_model(speaker_features)
-   if persons==0:
-      person='Dina'
-   elif persons==1:
-      person='Kareman'
-   elif persons==2:
-      person='Mariam'
-   elif persons==3:
-      person='Nada'
-   else:
-      person='others'
+   # speaker_features=[]
+   # speaker_features.append(extractSpeakerFeatures())
+   # persons=load_sound_model(speaker_features)
+   # if persons==0:
+   #    person='Dina'
+   # elif persons==1:
+   #    person='Kareman'
+   # elif persons==2:
+   #    person='Mariam'
+   # elif persons==3:
+   #    person='Nada'
+   # else:
+   #    person='others'
+   speaker=speaker_model()
 
-   print(f'speaker{persons},words{words}')
-   return render_template('index.html',words=word,persons=person)
+   print(f'speaker{speaker},words{words}')
+   return render_template('index.html',words=word,persons=speaker)
 
 if __name__ == '__main__':
    app.run(debug=True)
