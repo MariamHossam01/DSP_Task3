@@ -8,7 +8,8 @@ import wave
 import python_speech_features as mfcc
 from sklearn.mixture import GaussianMixture 
 from sklearn import preprocessing
-
+from scipy.io.wavfile import read
+from Draw import*
 app = Flask(__name__,template_folder="templates")
 
 
@@ -105,7 +106,7 @@ def extract_features(audio,rate):
 
 def speaker_model():
 
-   audio, sr = librosa.load('audio/audio.wav', mono=True, duration=2.5)
+   sr,audio = read('audio/audio.wav')
    vector   = extract_features(audio,sr)
 
    gmm_files    = ['gmm_models/dina.gmm','gmm_models/kareman.gmm','gmm_models/mariam.gmm','gmm_models/nada.gmm']
@@ -118,19 +119,23 @@ def speaker_model():
       log_likelihood[i] = scores.sum()
    print(log_likelihood)
    winner = np.argmax(log_likelihood)
-   speakers=['dina','kareman','mariam','nada']
+
+   if max(log_likelihood)<-24:
+      return 'others'
+   
+   speakers=['Dina','Kareman','Mariam','Nada']
    return speakers[winner]
 
 
-def load_sound_model(x):
-   model = pickle.load(open("trained_speaker_model.sav",'rb')) 
-   y=model.predict(np.array(x).reshape(1,-1))[0]
-   return y
+# def load_sound_model(x):
+#    model = pickle.load(open("trained_speaker_model.sav",'rb')) 
+#    y=model.predict(np.array(x).reshape(1,-1))[0]
+#    return y
 
 
 @app.route('/', methods=['GET', 'POST'])
 def speechRecognation():
-   # words
+   
    record()
 
    speech_features=[]
@@ -138,28 +143,32 @@ def speechRecognation():
    words=load_speech_model(speech_features)
    if words==0:
       word='open the door'
-   elif words==1:
-      word='close the door'
    else:
       word='others'
-   # speaker
-   # speaker_features=[]
-   # speaker_features.append(extractSpeakerFeatures())
-   # persons=load_sound_model(speaker_features)
-   # if persons==0:
-   #    person='Dina'
-   # elif persons==1:
-   #    person='Kareman'
-   # elif persons==2:
-   #    person='Mariam'
-   # elif persons==3:
-   #    person='Nada'
-   # else:
-   #    person='others'
+
    speaker=speaker_model()
 
    print(f'speaker{speaker},words{words}')
-   return render_template('index.html',words=word,persons=speaker)
+
+
+
+   spectrum= visualize("audio/audio.wav")
+   spectrum='static/assets/images/result'+str(variables.counter)+'.jpg'
+   variables.counter+=1
+   spec_fig=spectral_features("audio/audio.wav")
+   spec_fig='static/assets/images/spec'+str(variables.counter)+'.jpg'
+   mfcc_fig=Mfcc("audio/audio.wav")
+   mfcc_fig='static/assets/images/mfcc'+str(variables.counter)+'.jpg'
+
+   
+   if speaker=='others':
+      return render_template('index.html',words='Unknown Person',spectrum=spectrum,spec_fig=spec_fig,mfcc_fig=mfcc_fig)
+   elif word=='others':
+      return render_template('index.html',words=f'Hello {speaker}, you entered the wrong password.',spectrum=spectrum,spec_fig=spec_fig,mfcc_fig=mfcc_fig)
+   else:
+      return render_template('index.html',words=f'Welcome {speaker}!',spectrum=spectrum,spec_fig=spec_fig,mfcc_fig=mfcc_fig)
+
+   
 
 if __name__ == '__main__':
    app.run(debug=True)

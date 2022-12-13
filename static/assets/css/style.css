@@ -1,0 +1,97 @@
+body {
+    position: absolute;
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: -ms-flexbox;
+    display: flex;
+    -webkit-box-pack: center;
+    -webkit-justify-content: center;
+    -ms-flex-pack: center;
+    justify-content: center;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    -ms-flex-align: center;
+    align-items: center;
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    background-color: #e4e8e8;
+
+}
+ion-icon {
+    right: 500px;
+    width: 90px;
+    height: 90px;
+}
+
+.title{
+    position: absolute;
+    top: 10px;
+    left:100px;
+    right: 100px;
+    border-style: outset;
+    border-radius: 30%;
+    background-color: darkslategray;
+    color: rgb(254, 255, 255);
+    text-align: center;
+    background:  linear-gradient(155deg, #99e9e3, #43448e);;
+    box-shadow: rgb(0 0 0 / 14%) 0px 2px 2px 0px, rgb(0 0 0 / 12%) 0px 3px 1px -2px, rgb(0 0 0 / 20%) 0px 1px 5px 0px;
+}
+.result {
+    position: absolute;
+    top: 150px;
+    right: 400px;
+    width: 700px;
+    height: 100px;
+    border-style:outset ;
+    text-align: center;
+    border-radius: 20%;
+    background-color: #b3dfe1;
+}
+.btnmic{
+    position: absolute;
+    top:140px;
+    left: 95px;
+    width: 70px;
+    height: 70px;
+}
+.features {
+    position: absolute;
+    top: 300px;
+    right: 50px;
+    width: 1000px;
+    height: 350px;
+}
+.spectrogram{
+    position: absolute;
+    top: 300px;
+    left: 20px;
+    width: 500px;
+    height: 350px;
+}
+.frame {
+    width: 300px;
+    height: 250px;
+    border: 3px outset #ccc;
+    background: #eee;
+    margin: auto;
+    padding: 15px 10px;
+  }
+[data-role="controls"] > button {
+    outline: none;
+    display: block;
+    border: outset;
+    background-image: -webkit-gradient(linear, left bottom, left top, from(#99e9e3), to(#43448e));
+    background-image: -o-linear-gradient(bottom, #99e9e3 0%, #43448e 100%);
+    background-image: linear-gradient(0deg, #99e9e3 0%, #43448e 100%);
+    border-radius: 50%;
+    width: 130px;
+    height: 130px;
+}
+
+[data-role="controls"] > button[data-recording="true"] {
+    background-color: #ff2038;
+    background-image: -webkit-gradient(linear, left bottom, left top, from(#ff2038), to(#b30003));
+    background-image: -o-linear-gradient(bottom, #ff2038 0%, #b30003 100%);
+    background-image: linear-gradient(0deg, #ff2038 0%, #b30003 100%);
+}
