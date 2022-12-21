@@ -7,7 +7,7 @@ import base64
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 import seaborn as sns
 import plotly.graph_objs as go
-
+import plotly.express as px
 class variables:
    counter=0
 
@@ -75,3 +75,22 @@ def image(fig,name):
    image_file_name='static/assets/images/'+str(name)+str(variables.counter)+'.jpg'
    plt.savefig(image_file_name)
    return f"<img src='data:image/png;base64,{data}'/>"
+
+def bar_plot(scores,speakers,threshold):
+   values = np.array(scores)
+   # split it up
+   above_threshold = np.maximum(values - threshold, 0)
+   below_threshold = np.minimum(values, threshold)
+
+   # and plot it
+   fig, ax = plt.subplots()
+   fig.patch.set_facecolor('#e4e8e8')
+   ax.bar(speakers, below_threshold, 0.5, color="#43448e")
+   ax.bar(speakers, above_threshold, 0.5, color="#b30003",
+         bottom=below_threshold)
+   ax.set(title=' Absolute Likelihood')
+   # creating the bar plot
+   img=image(fig,"bar")
+   return img
+
+

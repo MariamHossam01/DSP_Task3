@@ -46,17 +46,17 @@ def load_speech_model(x):
 
 def extractWavFeatures():
    list_of_features=[]
-   y, sr = librosa.load('audio/audio.wav', mono=True, duration=2.5)
+   audio, sample_rate = librosa.load('audio/audio.wav', mono=True, duration=2.5)
    # remove leading and trailing silence
-   y, index = librosa.effects.trim(y)
+   audio, index = librosa.effects.trim(audio)
 
-   chroma_stft = librosa.feature.chroma_stft(y=y, sr=sr)
-   rmse = librosa.feature.rms(y=y)
-   spec_cent = librosa.feature.spectral_centroid(y=y, sr=sr)
-   spec_bw = librosa.feature.spectral_bandwidth(y=y, sr=sr)
-   rolloff = librosa.feature.spectral_rolloff(y=y, sr=sr)
-   zcr = librosa.feature.zero_crossing_rate(y)
-   mfcc = librosa.feature.mfcc(y=y, sr=sr)
+   chroma_stft = librosa.feature.chroma_stft(y=audio, sr=sample_rate)
+   rmse = librosa.feature.rms(y=audio)
+   spec_cent = librosa.feature.spectral_centroid(y=audio, sr=sample_rate)
+   spec_bw = librosa.feature.spectral_bandwidth(y=audio, sr=sample_rate)
+   rolloff = librosa.feature.spectral_rolloff(y=audio, sr=sample_rate)
+   zcr = librosa.feature.zero_crossing_rate(audio)
+   mfccs = librosa.feature.mfcc(y=audio, sr=sample_rate)
 
    list_of_features.append(np.mean(chroma_stft))
    list_of_features.append(np.mean(rmse))
@@ -65,8 +65,8 @@ def extractWavFeatures():
    list_of_features.append(np.mean(rolloff))
    list_of_features.append(np.mean(zcr))
 
-   for e in mfcc:
-         list_of_features.append(np.mean(e))
+   for mfcc in mfccs:
+         list_of_features.append(np.mean(mfcc))
    
    return(list_of_features)
 
@@ -76,11 +76,11 @@ def calculate_delta(array):
    print(rows)
    print(cols)
    deltas = np.zeros((rows,20))
-   N = 2
+   Number = 2
    for i in range(rows):
       index = []
       j = 1
-      while j <= N:
+      while j <= Number:
          if i-j < 0:
             first =0
          else:
@@ -106,25 +106,30 @@ def extract_features(audio,rate):
 
 def speaker_model():
 
-   sr,audio = read('audio/audio.wav')
-   vector   = extract_features(audio,sr)
+   sample_rate,audio = read('audio/audio.wav')
+   features   = extract_features(audio,sample_rate)
 
    gmm_files    = ['gmm_models/dina.gmm','gmm_models/kareman.gmm','gmm_models/mariam.gmm','gmm_models/nada.gmm']
    models    = [pickle.load(open(fname,'rb')) for fname in gmm_files]
    log_likelihood = np.zeros(len(models)) 
-
+   threshold=-23
    for i in range(len(models)):
       gmm    = models[i]  #checking with each model one by one
-      scores = np.array(gmm.score(vector))
+      scores = np.array(gmm.score(features))
       log_likelihood[i] = scores.sum()
    print(log_likelihood)
    winner = np.argmax(log_likelihood)
-
-   if max(log_likelihood)<-24:
-      return 'others'
-   
    speakers=['Dina','Kareman','Mariam','Nada']
-   return speakers[winner]
+   positive_scores=[]
+   for score in log_likelihood:
+      positive_scores.append(-1*score)
+   bar=bar_plot(positive_scores,speakers,-1*threshold)
+   bar='static/assets/images/bar'+str(variables.counter)+'.jpg'
+
+   if max(log_likelihood)<threshold:
+      return 'others',bar
+   
+   return speakers[winner],bar
 
 
 # def load_sound_model(x):
@@ -146,7 +151,7 @@ def speechRecognation():
    else:
       word='others'
 
-   speaker=speaker_model()
+   speaker,bar=speaker_model()
 
    print(f'speaker{speaker},words{words}')
 
@@ -162,11 +167,11 @@ def speechRecognation():
 
    
    if speaker=='others':
-      return render_template('index.html',words='Unknown Person',spectrum=spectrum,spec_fig=spec_fig,mfcc_fig=mfcc_fig)
+      return render_template('index.html',words='Unknown Person',spectrum=spectrum,spec_fig=spec_fig,mfcc_fig=mfcc_fig,bar=bar)
    elif word=='others':
-      return render_template('index.html',words=f'Hello {speaker}, you entered the wrong password.',spectrum=spectrum,spec_fig=spec_fig,mfcc_fig=mfcc_fig)
+      return render_template('index.html',words=f'Hello {speaker}, you entered the wrong password.',spectrum=spectrum,spec_fig=spec_fig,mfcc_fig=mfcc_fig,bar=bar)
    else:
-      return render_template('index.html',words=f'Welcome {speaker}!',spectrum=spectrum,spec_fig=spec_fig,mfcc_fig=mfcc_fig)
+      return render_template('index.html',words=f'Welcome {speaker}!',spectrum=spectrum,spec_fig=spec_fig,mfcc_fig=mfcc_fig,bar=bar)
 
    
 

@@ -95,16 +95,17 @@
         <div class="title">
                <h1 > Speech Recognition Password  </h1>  
         </div>
-        
-        <div class="features">
-             <div style=" width: 450px; float:right;  right: 5px; "  > 
-            <img src="{{spec_fig}}" width="450" height="350" >  
-            </div> 
-            <div style="width:450px; float:left;  left: 20px;  "> 
-                 <img src="{{mfcc_fig}}" width="450" height="350" >
-                  
-            </div>  
+        <div class="gmmchart">
+            <img src="{{bar}}" width="500" height="300" title="GMM Model For Speaker">
+            
         </div>
+        <div class="spec">
+            <img src="{{spec_fig}}" width="500" height="300" title="Spectral Features">  
+            </div> 
+            <div class="mfcc">
+                <img src="{{mfcc_fig}}" width="500" height="300" title="MFCC Features" >
+            </div>
+
         <div class="btnmic">
             <div class="container">
                 <form method="post">
@@ -123,9 +124,11 @@
         <div class="result">
             <h1>{{words}}</h1>        
         </div>
+        
          <div class="spectrogram">
-            <img src="{{spectrum}}" width="450" height="350" > 
+            <img src="{{spectrum}}" width="500" height="300" title="Spectrogram"> 
         </div>
+
     <script type="module" src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.esm.js"></script>
     <script nomodule src="https://unpkg.com/ionicons@5.5.2/dist/ionicons/ionicons.js"></script>
     </body>
